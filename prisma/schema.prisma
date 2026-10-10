@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AccountType {
+  BANK
+  EWALLET
+  CASH
+  OTHER
+}
+
+enum CategoryType {
+  INCOME
+  EXPENSE
+}
+
+model Account {
+  id             String      @id @default(uuid()) @db.Uuid
+  name           String      @unique @db.VarChar(80)
+  type           AccountType
+  openingBalance Decimal     @default(0) @db.Decimal(18, 2)
+  minimumBalance Decimal     @default(0) @db.Decimal(18, 2)
+  isArchived     Boolean     @default(false)
+  createdAt      DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime    @updatedAt @db.Timestamptz(3)
+  transactions   Transaction[]
+  transfersFrom  AccountTransfer[] @relation("TransferFrom")
+  transfersTo    AccountTransfer[] @relation("TransferTo")
+
+  @@index([isArchived, name])
+}
+
+model Category {
+  id         String       @id @default(uuid()) @db.Uuid
+  name       String       @db.VarChar(60)
+  type       CategoryType
+  parentId   String?      @db.Uuid
+  isArchived Boolean      @default(false)
+  createdAt  DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime     @updatedAt @db.Timestamptz(3)
+  transactions Transaction[] @relation("TransactionCategory")
+  budgetSourceTransactions Transaction[] @relation("BudgetSourceCategory")
+  budgetAllocations BudgetAllocation[]
+  parent     Category?    @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  subcategories Category[] @relation("CategoryHierarchy")
+
+  @@unique([type, name])
+  @@index([type, isArchived, name])
+  @@index([parentId])
+}
+
+model Transaction {
+  id              String   @id @default(uuid()) @db.Uuid
+  transactionDate DateTime @db.Date
+  amount          Decimal  @db.Decimal(18, 2)
+  description     String?  @db.VarChar(160)
+  accountId       String   @db.Uuid
+  categoryId      String   @db.Uuid
+  budgetCategoryId String? @db.Uuid
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+  account         Account  @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  category        Category @relation("TransactionCategory", fields: [categoryId], references: [id], onDelete: Restrict)
+  budgetCategory  Category? @relation("BudgetSourceCategory", fields: [budgetCategoryId], references: [id], onDelete: Restrict)
+
+  @@index([transactionDate])
+  @@index([accountId, transactionDate])
+  @@index([categoryId, transactionDate])
+  @@index([budgetCategoryId, transactionDate])
+}
+
+model AccountTransfer {
+  id              String   @id @default(uuid()) @db.Uuid
+  transferDate    DateTime @db.Date
+  amount          Decimal  @db.Decimal(18, 2)
+  description     String?  @db.VarChar(160)
+  fromAccountId   String   @db.Uuid
+  toAccountId     String   @db.Uuid
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+  fromAccount     Account  @relation("TransferFrom", fields: [fromAccountId], references: [id], onDelete: Restrict)
+  toAccount       Account  @relation("TransferTo", fields: [toAccountId], references: [id], onDelete: Restrict)
+
+  @@index([transferDate])
+  @@index([fromAccountId, transferDate])
+  @@index([toAccountId, transferDate])
+}
+
+model BudgetPeriod {
+  id        String   @id @default(uuid()) @db.Uuid
+  startsOn  DateTime @db.Date
+  endsOn    DateTime @db.Date
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  allocations BudgetAllocation[]
+
+  @@index([startsOn, endsOn])
+}
+
+model BudgetAllocation {
+  id         String       @id @default(uuid()) @db.Uuid
+  periodId   String       @db.Uuid
+  categoryId String       @db.Uuid
+  amount     Decimal      @db.Decimal(18, 2)
+  createdAt  DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime     @updatedAt @db.Timestamptz(3)
+  period     BudgetPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  category   Category     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@unique([periodId, categoryId])
+  @@index([categoryId])
+}
