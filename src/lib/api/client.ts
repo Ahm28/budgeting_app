@@ -7,6 +7,7 @@ export async function apiRequest<T>(
   init?: RequestInit,
 ): Promise<T> {
   const normalizedPath = path.replace(/^\/+/, "");
+  console.log("API Request:", `${apiBaseUrl}/${normalizedPath}`, init);
   const response = await fetch(`${apiBaseUrl}/${normalizedPath}`, {
     ...init,
     credentials: "include",

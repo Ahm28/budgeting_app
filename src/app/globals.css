@@ -147,6 +147,11 @@ button:disabled {
 .cashflow-controls { display: flex; align-items: flex-end; gap: 10px; }
 .month-picker { display: grid; gap: 6px; color: var(--muted); font-size: 10px; font-weight: 650; }
 .month-picker input { min-height: 40px; padding: 0 11px; border: 1px solid var(--line); border-radius: 9px; background: white; color: var(--ink); font-size: 12px; }
+.cashflow-filters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; gap: 10px; margin-bottom: 9px; padding: 15px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.cashflow-filters .form-field { min-width: 0; margin: 0; }
+.cashflow-filters .form-field input, .cashflow-filters .form-field [data-slot="select-trigger"] { min-height: 40px; }
+.cashflow-filter-reset { min-height: 40px; }
+.cashflow-filter-context { margin: 0 0 12px; color: var(--muted); font-size: 10px; }
 .cashflow-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 24px; }
 .cashflow-total { display: grid; gap: 12px; padding: 19px 20px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface); }
 .cashflow-total-label { color: var(--muted); font-size: 12px; font-weight: 550; }
@@ -215,12 +220,12 @@ button:disabled {
 .dashboard-metric > strong { overflow-wrap: anywhere; font-size: clamp(16px, 2vw, 21px); font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
 .dashboard-pies { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
 .pie-chart-content { display: grid; grid-template-columns: minmax(138px, 0.8fr) minmax(0, 1fr); align-items: center; gap: 18px; }
-.pie-chart { display: grid; width: min(100%, 184px); aspect-ratio: 1; place-items: center; justify-self: center; border-radius: 50%; }
-.pie-chart-center { display: grid; width: 62%; aspect-ratio: 1; align-content: center; justify-items: center; gap: 4px; overflow: hidden; padding: 8px; border-radius: 50%; background: var(--surface); text-align: center; }
-.pie-chart-center strong { max-width: 100%; overflow: hidden; font-size: clamp(10px, 1.2vw, 14px); font-weight: 650; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
-.pie-chart-center span { color: var(--muted); font-size: 9px; }
+.pie-chart { width: min(100%, 184px); height: 184px; justify-self: center; }
 .pie-chart-legend { display: grid; max-height: 220px; gap: 10px; overflow-y: auto; margin: 0; padding: 0 3px 0 0; list-style: none; }
-.pie-chart-legend li { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 10px; }
+.pie-chart-legend li { min-width: 0; }
+.pie-chart-legend button { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: space-between; gap: 10px; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; }
+.pie-chart-legend button:hover .pie-legend-label span:last-child { text-decoration: underline; }
+.pie-chart-legend button.is-hidden { opacity: 0.45; }
 .pie-legend-label { display: flex; min-width: 0; align-items: center; gap: 7px; font-size: 10px; }
 .pie-legend-label i { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 3px; }
 .pie-legend-label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -508,14 +513,15 @@ button:disabled {
 .section-tabs {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px;
+  /* gap: 5px; */
+  /* padding: 4px; */
   border-radius: 11px;
   background: #f1f4f2;
 }
 
 .section-tab {
   min-height: 36px;
+  width: 100%;
   padding: 0 16px;
   border: 0;
   border-radius: 8px;
@@ -701,6 +707,33 @@ button:disabled {
   min-width: 0;
   align-items: center;
   gap: 11px;
+}
+
+.category-collapse-toggle {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  color: var(--muted);
+}
+
+.category-collapse-spacer {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+}
+
+.category-children[hidden] {
+  display: none;
+}
+
+.category-child-row {
+  background: #fbfcfb;
+}
+
+.category-child-row .record-name-cell {
+  padding-left: 34px;
 }
 
 .record-name-cell > div {
@@ -940,7 +973,7 @@ button:disabled {
 }
 
 .icon-button {
-  display: grid;
+  /* display: grid;
   width: 32px;
   height: 32px;
   place-items: center;
@@ -949,7 +982,7 @@ button:disabled {
   background: #f2f5f3;
   color: #6d7973;
   font-size: 22px;
-  line-height: 1;
+  line-height: 1; */
 }
 
 .icon-button:hover {
@@ -1059,6 +1092,7 @@ button:disabled {
   .dashboard-pies { grid-template-columns: 1fr; }
   .dashboard-columns { grid-template-columns: 1fr; }
   .dashboard-side-column { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cashflow-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
   .account-grid {
     grid-template-columns: minmax(125px, 1.25fr) minmax(76px, 0.6fr) minmax(105px, 1fr) minmax(125px, 1fr) minmax(75px, 0.6fr) minmax(135px, 0.85fr);
@@ -1095,10 +1129,10 @@ button:disabled {
   .dashboard-metric > strong { font-size: clamp(14px, 4vw, 18px); }
   .dashboard-panel { padding: 16px 13px; }
   .pie-chart-content { grid-template-columns: minmax(118px, 0.8fr) minmax(0, 1fr); gap: 12px; }
-  .pie-chart { width: min(100%, 156px); }
-  .pie-chart-center strong { font-size: 11px; }
+  .pie-chart { width: min(100%, 156px); height: 156px; }
   .pie-chart-legend { max-height: 190px; gap: 8px; }
   .dashboard-side-column { grid-template-columns: 1fr; gap: 12px; }
+  .cashflow-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .budget-heading { display: grid; align-items: start; gap: 16px; margin-bottom: 20px; }
   .budget-period-controls { align-items: flex-end; justify-content: space-between; gap: 8px; }
   .budget-period-picker { min-width: 0; flex: 1; }
@@ -1123,6 +1157,7 @@ button:disabled {
   .cashflow-controls { flex-wrap: wrap; gap: 8px; }
   .cashflow-controls .add-button { min-height: 40px; font-size: 11px; }
   .cashflow-controls .transfer-button { min-height: 40px; padding: 0 10px; font-size: 11px; }
+  .cashflow-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px; }
   .cashflow-summary { gap: 8px; margin-bottom: 16px; }
   .cashflow-total { gap: 9px; padding: 13px 11px; border-radius: 12px; }
   .cashflow-total-label { font-size: 10px; }

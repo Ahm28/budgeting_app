@@ -17,6 +17,19 @@ function formatMoney(value: string | number) {
   return currency.format(Number(value) || 0);
 }
 
+function formatRupiahInput(value: string | number) {
+  const digits = String(value)
+    .replace(/\D/g, "")
+    .replace(/^0+(?=\d)/, "");
+
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+function parseRupiahInput(value: string) {
+  const digits = value.replace(/\D/g, "");
+  return digits ? Number(digits) : 0;
+}
+
 function dateInput(value: Date) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
 }
@@ -69,7 +82,7 @@ export default function BudgetScreen() {
     try {
       const detail = await loadDetails(selectedId);
       setDetails(detail);
-      setAmounts(Object.fromEntries(detail.allocations.map((allocation) => [allocation.categoryId, String(Number(allocation.amount))])));
+      setAmounts(Object.fromEntries(detail.allocations.map((allocation) => [allocation.categoryId, formatRupiahInput(allocation.amount)])));
       setError("");
     } catch (cause) {
       setError(errorMessage(cause));
@@ -105,7 +118,7 @@ export default function BudgetScreen() {
       .then((detail) => {
         if (!active) return;
         setDetails(detail);
-        setAmounts(Object.fromEntries(detail.allocations.map((allocation) => [allocation.categoryId, String(Number(allocation.amount))])));
+        setAmounts(Object.fromEntries(detail.allocations.map((allocation) => [allocation.categoryId, formatRupiahInput(allocation.amount)])));
         setError("");
       })
       .catch((cause: unknown) => {
@@ -118,7 +131,7 @@ export default function BudgetScreen() {
   }, [loadDetails, selectedId]);
 
   const totalBudget = useMemo(
-    () => details?.allocations.filter((row) => !row.category.parentId).reduce((sum, row) => sum + (Number(amounts[row.categoryId]) || 0), 0) ?? 0,
+    () => details?.allocations.filter((row) => !row.category.parentId).reduce((sum, row) => sum + parseRupiahInput(amounts[row.categoryId] ?? ""), 0) ?? 0,
     [amounts, details],
   );
   const invalidParentBudgets = useMemo(() => {
@@ -129,8 +142,8 @@ export default function BudgetScreen() {
       if (!parentId) continue;
       const childrenTotal = details.allocations
         .filter((candidate) => candidate.category.parentId === parentId)
-        .reduce((sum, child) => sum + (Number(amounts[child.categoryId]) || 0), 0);
-      if (childrenTotal > (Number(amounts[parentId]) || 0)) invalid.add(parentId);
+        .reduce((sum, child) => sum + parseRupiahInput(amounts[child.categoryId] ?? ""), 0);
+      if (childrenTotal > parseRupiahInput(amounts[parentId] ?? "")) invalid.add(parentId);
     }
     return [...invalid];
   }, [amounts, details]);
@@ -198,13 +211,13 @@ export default function BudgetScreen() {
         body: JSON.stringify({
           allocations: details.allocations.map(({ categoryId }) => ({
             categoryId,
-            amount: Number(amounts[categoryId]) || 0,
+            amount: parseRupiahInput(amounts[categoryId] ?? ""),
           })),
         }),
       });
       if (!response.data) throw new Error("Rencana budget belum dapat disimpan.");
       setDetails(response.data);
-      setAmounts(Object.fromEntries(response.data.allocations.map((allocation) => [allocation.categoryId, String(Number(allocation.amount))])));
+      setAmounts(Object.fromEntries(response.data.allocations.map((allocation) => [allocation.categoryId, formatRupiahInput(allocation.amount)])));
       setNotice("Rencana budget disimpan.");
     } catch (cause) {
       setError(errorMessage(cause));
@@ -257,12 +270,12 @@ export default function BudgetScreen() {
             {details.allocations.length ? <div className="budget-table">
               <div className="budget-table-header"><span>Kategori</span><span>Rencana</span><span>Terpakai</span><span>Sisa</span></div>
               {details.allocations.map((allocation) => {
-                const planned = Number(amounts[allocation.categoryId]) || 0;
+                const planned = parseRupiahInput(amounts[allocation.categoryId] ?? "");
                 const spent = Number(allocation.spent);
                 const remaining = planned - spent;
                 return <div className="budget-table-row" key={allocation.categoryId}>
                   <strong>{allocation.category.parent ? `↳ ${allocation.category.name}` : allocation.category.name}{allocation.category.parent && <small>Subkategori dari {allocation.category.parent.name}</small>}{allocation.category.isArchived && <small> Diarsipkan</small>}</strong>
-                  <label className="budget-amount-input"><span>Rp</span><Input aria-label={`Budget ${allocation.category.name}`} type="number" min="0" step="1" value={amounts[allocation.categoryId] ?? "0"} disabled={allocation.category.isArchived} onChange={(event) => setAmounts((current) => ({ ...current, [allocation.categoryId]: event.target.value }))} /></label>
+                  <label className="budget-amount-input"><span>Rp</span><Input aria-label={`Budget ${allocation.category.name}`} type="text" inputMode="numeric" pattern="[0-9.]*" value={amounts[allocation.categoryId] ?? "0"} disabled={allocation.category.isArchived} onChange={(event) => setAmounts((current) => ({ ...current, [allocation.categoryId]: formatRupiahInput(event.target.value) }))} /></label>
                   <span>{formatMoney(spent)}</span>
                   <strong className={remaining < 0 ? "negative" : ""}>{formatMoney(remaining)}</strong>
                 </div>;
@@ -281,7 +294,15 @@ export default function BudgetScreen() {
 
       <Dialog open={Boolean(periodDialog)} onOpenChange={(open) => { if (!open && !saving) setPeriodDialog(null); }}>
         <DialogContent className="dialog-card" showCloseButton={false}>
-          <DialogHeader className="dialog-heading"><div><p className="eyebrow">BUDGETING</p><DialogTitle id="period-dialog-title">{periodDialog === "create" ? "Periode budget baru" : "Ubah periode budget"}</DialogTitle></div><Button className="icon-button" aria-label="Tutup" type="button" disabled={saving} onClick={() => setPeriodDialog(null)}>×</Button></DialogHeader>
+          <DialogHeader className="dialog-heading">
+            <div>
+              <p className="eyebrow">BUDGETING</p>
+              <DialogTitle id="period-dialog-title">
+                {periodDialog === "create" ? "Periode budget baru" : "Ubah periode budget"}
+              </DialogTitle>
+            </div>
+            <Button variant={"secondary"} className="icon-button" aria-label="Tutup" disabled={saving} onClick={() => setPeriodDialog(null)}>×</Button>
+          </DialogHeader>
           <form onSubmit={(event) => void savePeriod(event)}>
             <div className="form-grid">
               <label className="form-field">Tanggal mulai<Input type="date" required value={periodInput.startsOn} onChange={(event) => setPeriodInput((current) => ({ ...current, startsOn: event.target.value }))} /></label>

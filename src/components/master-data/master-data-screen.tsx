@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -44,6 +45,19 @@ const currency = new Intl.NumberFormat("id-ID", {
 
 function formatRupiah(amount: string | number) {
   return currency.format(Number(amount) || 0);
+}
+
+function formatRupiahInput(value: string | number) {
+  const digits = String(value)
+    .replace(/\D/g, "")
+    .replace(/^0+(?=\d)/, "");
+
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+function parseRupiahInput(value: string) {
+  const digits = value.replace(/\D/g, "");
+  return digits ? Number(digits) : 0;
 }
 
 function messageFrom(error: unknown) {
@@ -192,7 +206,21 @@ export default function MasterDataScreen() {
 
   function openCreateDialog() {
     setNotice("");
-    setDialog(section === "categories" ? { kind: "category" } : { kind: "account" });
+    setDialog(
+      section === "categories" ? 
+        { 
+          kind: "category",
+          record: { 
+            type: categoryType,
+            id: '',
+            name: '',
+            parentId: null,
+            isArchived: false,
+            createdAt: "",
+            updatedAt: ""  
+          }
+        } 
+        : { kind: "account" });
   }
 
   return (
@@ -229,8 +257,8 @@ export default function MasterDataScreen() {
                 <TabsTrigger className={section === "accounts" ? "section-tab active" : "section-tab"} value="accounts">Akun</TabsTrigger>
               </TabsList>
             </Tabs>
-            <Button className="button button-primary add-button" onClick={openCreateDialog}>
-              <span aria-hidden="true">＋</span>
+            <Button onClick={openCreateDialog}>
+              <span className="font-semibold" aria-hidden="true">＋</span>
               Tambah {section === "categories" ? "kategori" : "akun"}
             </Button>
           </div>
@@ -257,18 +285,18 @@ export default function MasterDataScreen() {
           </div>
 
           {section === "categories" && (
-            <Tabs value={categoryType} onValueChange={(value) => setCategoryType(value as CategoryType)}>
-              <TabsList className="filter-row" aria-label="Filter jenis kategori">
+            <Tabs className="px-6" value={categoryType} onValueChange={(value) => setCategoryType(value as CategoryType)}>
+              <TabsList className="section-tabs" aria-label="Filter jenis kategori">
                 {(["EXPENSE", "INCOME"] as const).map((type) => (
                   <TabsTrigger
-                  className={categoryType === type ? "filter-chip selected" : "filter-chip"}
-                  key={type}
-                  value={type}
-                >
-                  {categoryTypeLabels[type]}
-                  <span className="filter-count">
-                    {categories.filter((item) => item.type === type && item.isArchived === showArchived).length}
-                  </span>
+                    className={categoryType === type ? "section-tab active" : "section-tab"}
+                    key={type}
+                    value={type}
+                  >
+                    {categoryTypeLabels[type]}
+                    <span className="filter-count">
+                      {categories.filter((item) => item.type === type && item.isArchived === showArchived).length}
+                    </span>
                   </TabsTrigger>
                 ))}
               </TabsList>
@@ -351,6 +379,8 @@ function CategoryList({
   onArchive: (record: CategoryRecord) => void;
   onCreate: () => void;
 }) {
+  const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(() => new Set());
+
   if (categories.length === 0) {
     return (
       <EmptyState
@@ -365,6 +395,56 @@ function CategoryList({
     );
   }
 
+  const categoryIds = new Set(categories.map((category) => category.id));
+  const parentCategories = categories.filter((category) => !category.parentId || !categoryIds.has(category.parentId));
+
+  function renderCategoryRow(category: CategoryRecord, isChild = false, childCount = 0, expanded = false) {
+    return (
+      <article className={`record-row category-grid${isChild ? " category-child-row" : ""}`} key={category.id}>
+        <div className="record-name-cell">
+          {childCount > 0 ? (
+            <Button
+              aria-controls={`category-children-${category.id}`}
+              aria-expanded={expanded}
+              aria-label={`${expanded ? "Tutup" : "Buka"} subkategori ${category.name}`}
+              className="category-collapse-toggle"
+              onClick={() => setExpandedCategoryIds((current) => {
+                const next = new Set(current);
+                if (next.has(category.id)) next.delete(category.id);
+                else next.add(category.id);
+                return next;
+              })}
+              size="icon-xs"
+              type="button"
+              variant="ghost"
+            >
+              {expanded ? <ChevronDown aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
+            </Button>
+          ) : !isChild ? <span className="category-collapse-spacer" aria-hidden="true" /> : null}
+          <span className={`record-icon ${category.type === "INCOME" ? "icon-income" : "icon-expense"}`}>
+            {category.type === "INCOME" ? "↙" : "↗"}
+          </span>
+          <div>
+            <strong>{category.name}</strong>
+            {childCount > 0 && <small className="category-parent-hint">{childCount} subkategori</small>}
+            {category.parent && <small className="category-parent-hint">{category.parent.name}</small>}
+            <span className="mobile-row-label">{category.parent ? `Subkategori · ${category.parent.name}` : "Kategori induk"}</span>
+          </div>
+        </div>
+        <span className="type-label">{categoryTypeLabels[category.type]}</span>
+        <span className={archived ? "status-pill status-archived" : "status-pill status-active"}>
+          {archived ? "Diarsipkan" : "Aktif"}
+        </span>
+        <RecordActions
+          archived={archived}
+          busy={savingId === category.id}
+          onEdit={() => onEdit(category)}
+          onArchive={() => onArchive(category)}
+        />
+      </article>
+    );
+  }
+
   return (
     <div className="record-list">
       <div className="record-list-head category-grid">
@@ -373,30 +453,19 @@ function CategoryList({
         <span>Status</span>
         <span className="align-right">Aksi</span>
       </div>
-      {categories.map((category) => (
-        <article className="record-row category-grid" key={category.id}>
-          <div className="record-name-cell">
-            <span className={`record-icon ${category.type === "INCOME" ? "icon-income" : "icon-expense"}`}>
-              {category.type === "INCOME" ? "↙" : "↗"}
-            </span>
-            <div>
-              <strong>{category.parent ? `↳ ${category.name}` : category.name}</strong>
-              {category.parent && <small className="category-parent-hint">{category.parent.name}</small>}
-              <span className="mobile-row-label">{category.parent ? `Subkategori Â· ${category.parent.name}` : "Kategori induk"}</span>
-            </div>
+      {parentCategories.map((category) => {
+        const children = categories.filter((candidate) => candidate.parentId === category.id);
+        const expanded = expandedCategoryIds.has(category.id);
+
+        return (
+          <div className="category-group" key={category.id}>
+            {renderCategoryRow(category, false, children.length, expanded)}
+            {children.length > 0 && <div className="category-children" id={`category-children-${category.id}`} hidden={!expanded}>
+              {children.map((child) => renderCategoryRow(child, true))}
+            </div>}
           </div>
-          <span className="type-label">{categoryTypeLabels[category.type]}</span>
-          <span className={archived ? "status-pill status-archived" : "status-pill status-active"}>
-            {archived ? "Diarsipkan" : "Aktif"}
-          </span>
-          <RecordActions
-            archived={archived}
-            busy={savingId === category.id}
-            onEdit={() => onEdit(category)}
-            onArchive={() => onArchive(category)}
-          />
-        </article>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -564,10 +633,15 @@ function CategoryDialog({
         </label>
         <label className="form-field">
           <span>Jenis kategori</span>
-          <SelectField value={type} onValueChange={(value) => { setType(value as CategoryType); setParentId(""); }} placeholder="Pilih jenis kategori" options={[
-            { value: "EXPENSE", label: "Pengeluaran" },
-            { value: "INCOME", label: "Pemasukan" },
-          ]} />
+          <SelectField 
+            value={type} 
+            onValueChange={(value) => { setType(value as CategoryType); setParentId(""); }}
+            placeholder="Pilih jenis kategori" 
+            options={[
+              { value: "EXPENSE", label: "Pengeluaran" },
+              { value: "INCOME", label: "Pemasukan" },
+            ]} 
+          />
         </label>
         <label className="form-field">
           <span>Kategori induk <small>Opsional, maksimal satu tingkat</small></span>
@@ -577,7 +651,11 @@ function CategoryDialog({
           ]} />
         </label>
         {error && <p className="form-error" role="alert">{error}</p>}
-        <DialogActions busy={busy} onClose={onClose} submitLabel={record ? "Simpan perubahan" : "Tambah kategori"} />
+        <DialogActions 
+          busy={busy} 
+          onClose={onClose} 
+          submitLabel={record?.id ? "Simpan perubahan" : "Tambah kategori"} 
+        />
       </form>
     </DialogFrame>
   );
@@ -595,10 +673,10 @@ function AccountDialog({
   const [name, setName] = useState(record?.name ?? "");
   const [type, setType] = useState<AccountType>(record?.type ?? "BANK");
   const [openingBalance, setOpeningBalance] = useState(
-    record ? String(Math.round(Number(record.openingBalance))) : "0",
+    record ? formatRupiahInput(record.openingBalance) : "0",
   );
   const [minimumBalance, setMinimumBalance] = useState(
-    record ? String(Math.round(Number(record.minimumBalance))) : "0",
+    record ? formatRupiahInput(record.minimumBalance) : "0",
   );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -608,7 +686,12 @@ function AccountDialog({
     setError("");
     setBusy(true);
     try {
-      await onSave({ name, type, openingBalance: Number(openingBalance), minimumBalance: Number(minimumBalance) }, record);
+      await onSave({
+        name,
+        type,
+        openingBalance: parseRupiahInput(openingBalance),
+        minimumBalance: parseRupiahInput(minimumBalance),
+      }, record);
     } catch (saveError) {
       setError(messageFrom(saveError));
     } finally {
@@ -641,11 +724,10 @@ function AccountDialog({
               <span>Rp</span>
               <Input
                 inputMode="numeric"
-                min="0"
-                onChange={(event) => setOpeningBalance(event.target.value)}
+                onChange={(event) => setOpeningBalance(formatRupiahInput(event.target.value))}
+                pattern="[0-9.]*"
                 required
-                step="1"
-                type="number"
+                type="text"
                 value={openingBalance}
               />
             </div>
@@ -657,11 +739,10 @@ function AccountDialog({
               <span>Rp</span>
               <Input
                 inputMode="numeric"
-                min="0"
-                onChange={(event) => setMinimumBalance(event.target.value)}
+                onChange={(event) => setMinimumBalance(formatRupiahInput(event.target.value))}
+                pattern="[0-9.]*"
                 required
-                step="1"
-                type="number"
+                type="text"
                 value={minimumBalance}
               />
             </div>
@@ -692,7 +773,7 @@ function DialogFrame({
             <p className="eyebrow">MASTER DATA</p>
             <DialogTitle id="dialog-title">{title}</DialogTitle>
           </div>
-          <Button aria-label="Tutup" className="icon-button" onClick={onClose} type="button">×</Button>
+          <Button variant={"secondary"} aria-label="Tutup" className="icon-button" onClick={onClose} type="button">×</Button>
         </DialogHeader>
         {children}
       </DialogContent>
